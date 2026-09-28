@@ -1,0 +1,372 @@
+<title>The Red Keep</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IM+Fell+English+SC&family=Figtree:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    color-scheme: dark;
+    --ink: #0b1519;
+    --panel: rgba(11, 21, 25, 0.8);
+    --panel-solid: #101d22;
+    --line: rgba(201, 164, 92, 0.3);
+    --line-strong: rgba(201, 164, 92, 0.65);
+    --brass: #c9a45c;
+    --keep: #a83a2c;
+    --keep-deep: #6e2219;
+    --text: #efe5d2;
+    --muted: #97a8ad;
+    --sea: #2b5d69;
+    --display: "IM Fell English SC", "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+    --ui: "Figtree", "Segoe UI", system-ui, sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  }
+  [hidden] { display: none !important; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    overflow: hidden;
+    background: var(--ink);
+    color: var(--text);
+    font: 14px/1.4 var(--ui);
+  }
+  #stage { position: fixed; inset: 0; }
+  #stage canvas { display: block; }
+  #labels { position: fixed; inset: 0; pointer-events: none; }
+
+  button { font: inherit; color: inherit; }
+  button:focus-visible { outline: 2px solid var(--brass); outline-offset: 2px; }
+
+  .brand {
+    position: fixed;
+    top: calc(16px + env(safe-area-inset-top, 0px));
+    left: 16px;
+    pointer-events: none;
+    text-shadow: 0 1px 12px rgba(0, 0, 0, 0.55);
+  }
+  .brand h1 {
+    margin: 0;
+    font: 400 30px/1 var(--display);
+    letter-spacing: 0.02em;
+    text-wrap: balance;
+  }
+  .brand h1 span { color: var(--keep); filter: brightness(1.35); }
+  .brand p { margin: 4px 0 0; color: var(--muted); font-size: 12.5px; }
+  .brand .stage-note {
+    display: inline-block;
+    margin-top: 8px;
+    padding: 2px 8px;
+    border: 1px solid var(--line);
+    border-radius: 2px;
+    font: 500 10.5px/1.5 var(--mono);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--brass);
+    background: var(--panel);
+  }
+
+  /* Floor rail drawn as a building section: row height follows real floor-to-floor height. */
+  .section {
+    position: fixed;
+    z-index: 10;
+    left: 16px;
+    top: 124px;
+    width: 236px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    backdrop-filter: blur(6px);
+  }
+  .section header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 9px 12px 7px;
+    border-bottom: 1px solid var(--line);
+    font: 500 10.5px var(--mono);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .section ol { list-style: none; margin: 0; padding: 0; }
+  .floor-btn {
+    display: grid;
+    grid-template-columns: 26px 1fr auto;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    min-height: 24px;
+    height: calc(var(--ft, 4) * 6.4px);
+    padding: 0 12px;
+    border: 0;
+    border-bottom: 1px solid rgba(201, 164, 92, 0.12);
+    background: transparent;
+    text-align: left;
+    cursor: pointer;
+    position: relative;
+  }
+  .floor-btn:hover { background: rgba(201, 164, 92, 0.08); }
+  .floor-btn[aria-pressed="true"] {
+    background: linear-gradient(90deg, rgba(168, 58, 44, 0.55), rgba(168, 58, 44, 0.12));
+  }
+  .floor-btn[aria-pressed="true"]::before {
+    content: "";
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 3px;
+    background: var(--keep);
+    filter: brightness(1.4);
+  }
+  .floor-btn .num { font: 500 11px var(--mono); color: var(--brass); }
+  .floor-btn .name { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .floor-btn .elev { font: 400 11px var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+  .floor-btn.whole { height: 34px; border-bottom: 1px solid var(--line); }
+  .floor-btn.whole .name { font-family: var(--display); font-size: 16px; }
+  .floor-btn.rock .name { color: #d5c7b3; }
+  .sea-line {
+    display: flex;
+    justify-content: space-between;
+    padding: 5px 12px 7px;
+    font: 400 10.5px var(--mono);
+    color: #7fb3bf;
+    background: linear-gradient(180deg, rgba(43, 93, 105, 0.45), rgba(43, 93, 105, 0.1));
+    border-top: 1px dashed rgba(127, 179, 191, 0.6);
+  }
+
+  .modes {
+    position: fixed;
+    z-index: 10;
+    top: calc(16px + env(safe-area-inset-top, 0px));
+    right: 16px;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+  .seg {
+    display: flex;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .seg button, .chip-btn {
+    padding: 8px 14px;
+    border: 0;
+    background: transparent;
+    cursor: pointer;
+    font-weight: 500;
+    letter-spacing: 0.01em;
+  }
+  .seg button + button { border-left: 1px solid var(--line); }
+  .seg button[aria-pressed="true"] { background: var(--keep-deep); color: #fff4e4; }
+  .chip-btn {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 3px;
+  }
+  .chip-btn[aria-pressed="true"] {
+    border-color: #8fd0ff;
+    color: #cfeaff;
+    box-shadow: 0 0 0 1px rgba(143, 208, 255, 0.35), 0 0 18px rgba(143, 208, 255, 0.25);
+  }
+
+  .hud-top {
+    position: fixed;
+    top: calc(18px + env(safe-area-inset-top, 0px));
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    padding: 6px 14px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    font: 500 12px var(--mono);
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
+  .hud-top b { font: 400 20px/1 var(--display); color: var(--text); }
+  .where {
+    position: fixed;
+    left: 16px;
+    bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+    padding: 10px 14px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--keep);
+    border-radius: 3px;
+    min-width: 220px;
+  }
+  .where .room { font: 400 22px/1.1 var(--display); }
+  .where .meta { margin-top: 3px; font: 400 11.5px var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+  .notice {
+    position: fixed;
+    z-index: 6;
+    left: 50%;
+    bottom: calc(92px + env(safe-area-inset-bottom, 0px));
+    transform: translateX(-50%);
+    padding: 8px 14px;
+    background: var(--panel);
+    border: 1px solid var(--line-strong);
+    border-radius: 3px;
+    font-size: 13px;
+    white-space: nowrap;
+  }
+  .notice kbd, .keys kbd {
+    display: inline-block;
+    min-width: 1.5em;
+    padding: 0 5px;
+    border: 1px solid var(--line-strong);
+    border-radius: 2px;
+    font: 500 11px/1.6 var(--mono);
+    text-align: center;
+    color: var(--brass);
+  }
+  .crosshair {
+    position: fixed;
+    left: 50%; top: 50%;
+    width: 6px; height: 6px;
+    margin: -3px 0 0 -3px;
+    border: 1px solid rgba(255, 244, 228, 0.85);
+    border-radius: 50%;
+    pointer-events: none;
+    mix-blend-mode: difference;
+  }
+  .gate {
+    position: fixed;
+    inset: 0;
+    z-index: 5;
+    display: grid;
+    place-items: center;
+    background: rgba(8, 14, 17, 0.35);
+    cursor: pointer;
+  }
+  .gate div {
+    padding: 16px 22px;
+    background: var(--panel-solid);
+    border: 1px solid var(--line-strong);
+    border-radius: 3px;
+    text-align: center;
+    max-width: 340px;
+  }
+  .gate strong { display: block; font: 400 22px var(--display); margin-bottom: 4px; }
+  .gate span { color: var(--muted); font-size: 13px; }
+
+  .keys {
+    position: fixed;
+    right: 16px;
+    bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+    max-width: 440px;
+    padding: 9px 12px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    color: var(--muted);
+    font-size: 12.5px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 14px;
+    justify-content: flex-end;
+  }
+  .keys span { white-space: nowrap; }
+
+  .tag {
+    pointer-events: auto;
+    padding: 3px 8px 4px;
+    border: 1px solid rgba(201, 164, 92, 0.7);
+    border-radius: 2px;
+    background: rgba(11, 21, 25, 0.86);
+    color: var(--text);
+    font: 500 12px var(--ui);
+    white-space: nowrap;
+    cursor: pointer;
+    transform: translateY(-10px);
+  }
+  .tag:hover, .tag:focus-visible { background: var(--keep-deep); border-color: var(--brass); }
+  .tag.outdoor { border-style: dashed; }
+
+  #loading {
+    position: fixed;
+    z-index: 20;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    background: var(--ink);
+    font: 400 26px var(--display);
+    color: var(--text);
+    transition: opacity 0.6s ease;
+  }
+  #loading small { display: block; margin-top: 6px; font: 400 12px var(--mono); color: var(--muted); text-align: center; }
+  #loading.done { opacity: 0; pointer-events: none; }
+
+  @media (max-width: 720px) {
+    .brand h1 { font-size: 24px; }
+    .brand p, .brand .stage-note { display: none; }
+    .section {
+      top: auto;
+      left: 16px;
+      right: 16px;
+      bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+      width: auto;
+      overflow-x: auto;
+    }
+    .section header, .sea-line { display: none; }
+    .section ol { display: flex; }
+    .floor-btn, .floor-btn.whole { height: 44px; min-width: 128px; border-bottom: 0; border-right: 1px solid rgba(201, 164, 92, 0.15); }
+    .keys { display: none; }
+    .where { bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
+    .modes { top: calc(60px + env(safe-area-inset-top, 0px)); left: 16px; justify-content: flex-start; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    #loading { transition: none; }
+  }
+</style>
+
+<div id="stage"></div>
+<div id="labels"></div>
+
+<div class="brand">
+  <h1>The <span>Red</span> Keep</h1>
+  <p>Hellfire Bay, Krakoa &middot; eastern headland</p>
+  <p class="stage-note">Stage 1 &middot; layout blockout</p>
+</div>
+
+<nav class="section" aria-label="Floors">
+  <header><span>Section</span><span>above sea</span></header>
+  <ol id="floor-list"></ol>
+  <div class="sea-line"><span>Pacific</span><span>&plusmn;0.0 m</span></div>
+</nav>
+
+<div class="modes">
+  <div class="seg" role="group" aria-label="View">
+    <button id="btn-doll" aria-pressed="true">Dollhouse</button>
+    <button id="btn-walk" aria-pressed="false">Walk</button>
+  </div>
+  <button id="btn-phase" class="chip-btn" aria-pressed="false" hidden title="Walk through walls, the way Kate does">Phase</button>
+</div>
+
+<div id="compass" class="hud-top" hidden><span>Heading</span><b id="compass-dir">W</b><span id="compass-deg">270&deg;</span></div>
+<div id="where" class="where" hidden><div class="room" id="where-room">Living room</div><div class="meta" id="where-meta">Floor 4 &middot; +24.0 m</div></div>
+<div id="notice" class="notice" hidden></div>
+<div id="crosshair" class="crosshair" hidden></div>
+<div id="gate" class="gate" hidden>
+  <div><strong>Click to look around</strong><span>Your mouse steers. Press <kbd>Esc</kbd> to get the cursor back, <kbd>M</kbd> for the dollhouse.</span></div>
+</div>
+
+<div id="keys" class="keys"></div>
+
+<div id="loading">
+  <div>Raising the Keep&hellip;<small>nine floors into the headland</small></div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.186.1/examples/jsm/",
+    "three-mesh-bvh": "https://cdn.jsdelivr.net/npm/three-mesh-bvh@0.9.15/build/index.module.js"
+  }
+}
+</script>
+<script type="module" src="app.js"></script>
