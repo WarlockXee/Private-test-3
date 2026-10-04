@@ -1,0 +1,8 @@
+{
+	"name": "Danbooru Images",
+	"author": "WarlockXee",
+	"description": "Shows larger Danbooru images in feed articles, loaded directly from the CDN or through your own proxy.",
+	"version": "1.0.0",
+	"entrypoint": "DanbooruImages",
+	"type": "user"
+}
